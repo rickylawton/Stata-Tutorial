@@ -3,10 +3,12 @@
 /** For use with 3 year 2012-2015 APS wellbeing data UKDA 7924								     **/
 /***************************************************************************************************/
 
-// Setup paths
+// Setup paths - This tells stata where to find data files and save outputs 
 global PROJECT "$DROPBOX/Simetrica Data\APS/tutorial_temp" // Dropbox project folder
 global OUTPUT  "$PROJECT/Output"                                   // .. Output folder
 global INPUT   "$PROJECT/Input"                                    // .. Input folder
+
+/* Open the APS dataset 																			*/
 use "$DROPBOX\Simetrica Data\APS\UKDA-7924-stata11\stata11\a12m15_wellbeing_eul.dta", clear
 
 /***************************************************************************************************/
@@ -61,7 +63,7 @@ tabulate female sex // After creating a new variable you should crosstabulate th
 /** LS= Life Satisfaction, WW= Worthwhile, HA= Happiness Yesterday and AN= Anxiety Yesterday      **/
 /** PAB= Positive Affect Balance HA minus (10 minus AN)                                           **/    
 /***************************************************************************************************/
-
+* Here we recode the existing variable excluding observations outside of the 0-10 scale, and generate a new set of SWB variables
 
 recode satis (0 = 0)(10 = 10), gen (LS)
 replace LS =. if (satis ==. | satis<0 | satis >10)
@@ -71,7 +73,7 @@ recode happy (0 = 0)(10 = 10), gen (HA)
 replace HA =. if (happy ==.  | happy<0 | happy >10)
 recode anxious (0 = 0)(10 = 10), gen (AN)
 replace AN =. if (anxious ==.  | anxious<0 | anxious >10)
-
+* Positive Affect Balance (PAB) = happiness / anxiety
 gen PAB=.
 replace PAB = (HA - AN)/2
 replace PAB =. if (HA ==. | AN ==.)
@@ -93,6 +95,11 @@ replace age=dvage if (dvage>0 & dvage!=.) //
 gen agesq = age * age
 label variable agesq "Age Squared"
 label variable age "Age"
+
+*Alternatviely we could create a log age variable
+gen lage = ln(dvage) 
+replace lage = . if if dvage < 0 | dvage > . 
+label var lage "Log age"
 
 /***************************************************************************************************/
 /** Subjective wellbeing varies by marital status.  											  **/
@@ -129,6 +136,7 @@ gen maritals = marsta
 replace maritals = . if marsta > 10 | marsta < 0 // To drop any potential missing observation categories
 label var maritals "Marital status"
 * You can now use the variable as i.maritals in regressions
+
 /***************************************************************************************************/
 /** Combine multiple categories into one Dummy               		      						  **/
 /** We may want to combine categories togethereg single; married/couple; divorced/seperated; widowed/surviving		**/
@@ -173,8 +181,9 @@ ta marsta m_widowed
 * All present and accounted for?
 
 /***************************************************************************************************/
-/** 		Loops!!! Yay! 																			***/
-*There is a cooler way to run multiple commands at the same time using the "foreach" command */
+/** 		Loops!!! Yay! 																		 ***/
+/***************************************************************************************************/
+*There is a smarter way to run multiple commands at the same time using the "foreach" command */
 
 foreach var of global maritals { // Tells stata, for each variable in the global list maritals... THis is followed by an open brackt { The loop happens within the brackets
 ta marsta `var' // crosstab marsta with each of the variables in the global (`var', this time in inverted commas to denote its role in the loop 
@@ -329,7 +338,6 @@ label variable ed_unknown "Qualifications unknown"
 /* Global education: Reference=degree */
 global education ed_higherdegree ed_alevel ed_gcse ed_otherqual ed_noqual ed_unknown
 
-
 * Most commonly, we simply create a single dummy for higher education (degree or higher ed)
 gen degreeorhigher=.
 replace degreeorhigher = 1 if hiqul11d == 1 | hiqul11d == 2
@@ -462,7 +470,11 @@ gen DV_ftquin4 =  DVemp4_14
 gen DV_ftquin5 =  DVemp4_15 
 /* Ref unemployed & underemployed */
 global empincome DV_Inactive_seeking DV_Inactive_wants DV_Inactive_notseeking DV_retired  DV_student DV_unpaidfam  DV_ptemployed DV_selfemployed DV_ftquin1 DV_ftquin2 DV_ftquin3 DV_ftquin4 DV_ftquin5
-global empincome_stat DV_unemployed DV_underemployed DV_Inactive_seeking DV_Inactive_wants DV_Inactive_notseeking DV_retired  DV_student DV_unpaidfam  DV_ptemployed DV_selfemployed DV_ftquin1 DV_ftquin2 DV_ftquin3 DV_ftquin4 DV_ftquin5
+
+* Dummy variable for employed
+gen employed = econ_ftime ==1 | econ_pttime==1 | econ_selfemployed==1
+replace employed=. if econ_ftime==. & econ_pttime==. & econ_selfemployed==.
+
 /* Pay quintile for full time workers only (note, this will drop sample size by exlcuding non-FT workers */
 
 /* First, full time pay quintiles */
@@ -526,74 +538,8 @@ label variable ftpay_dec10 "10th income decile pay"
 
 global Decile ftpay_dec2 ftpay_dec3 ftpay_dec4 ftpay_dec5 ftpay_dec6 ftpay_dec7 ftpay_dec8 ftpay_dec9 ftpay_dec10
 
-
-
-/* Dummy varibles for employment only (excluding income quintiles */
-gen econ_ftime=.
-replace econ_ftime=1 if  ilodefr ==1 & ftptw ==6 
-replace econ_ftime=0 if (inecac05>1 & inecac05<26) | ftptw==-9 | (ftptw >0 & ftptw<6)
-label variable econ_ftime "Full-time"
-
-gen econ_pttime=.
-replace econ_pttime=1 if  ilodefr ==1 & (ftptw >0 & ftptw<6) 
-replace econ_pttime=0 if (inecac05>1 & inecac05<26) | ftptw==-9 |  ftptw ==6
-label variable econ_pttime "Part-time"
-
-gen econ_selfemployed=.
-replace econ_selfemployed=1 if inecac05==2
-replace econ_selfemployed=0 if (inecac05>0 & inecac05 <2) | (inecac05>2 & inecac05<26)
-label variable econ_selfemployed "Selfemployed"
-
-gen econ_govttraining=.
-replace econ_govttraining=1 if inecac05==3
-replace econ_govttraining=0 if (inecac05>0 & inecac05 <3) | (inecac05>3 & inecac05<26)
-label variable econ_govttraining "Govt training"
-
-gen econ_familyworker=.
-replace econ_familyworker=1 if inecac05==4
-replace econ_familyworker=0 if (inecac05>0 & inecac05 <4) | (inecac05>4 & inecac05<26)
-label variable econ_familyworker "Family worker"
-
-gen econ_unemployed=.
-replace econ_unemployed=1 if inecac05==5
-replace econ_unemployed=0 if (inecac05>0 & inecac05 <5) | (inecac05>5 & inecac05<26)
-label variable econ_unemployed "Unemployed"
-
-gen econ_student=.
-replace  econ_student=1 if inecac05==6 | inecac05==11 | inecac05==19
-replace econ_student=0 if (inecac05>0 & inecac05 <6) |  (inecac05>6 & inecac05 <11) | (inecac05>11 & inecac05<19)| (inecac05>19 & inecac05<26)
-label variable econ_student "Student"
-
-gen econ_retired=.
-replace  econ_retired=1 if inecac05==16 | inecac05==24
-replace econ_retired=0 if (inecac05>0 & inecac05 <16) |  (inecac05>16 & inecac05 <24) 
-label variable econ_retired "Retired"
-
-gen econ_inactiveseekingunavail=.
-replace  econ_inactiveseekingunavail=1 if (inecac05>=7 & inecac05<=9)
-replace econ_inactiveseekingunavail=0 if (inecac05>0 & inecac05 <7) |  (inecac05>9 & inecac05<26)
-label variable econ_inactiveseekingunavail "Inactive seeking but unavailable"
-
-gen econ_inactivenotseekingwants=.
-replace  econ_inactivenotseekingwants=1 if inecac05==10 | (inecac05>=12 & inecac05<=15) | inecac05==17
-replace econ_inactivenotseekingwants=0 if (inecac05>0 & inecac05 <10)  |  inecac05==11 | inecac05==16 | (inecac05>17 & inecac05<26)
-label variable econ_inactivenotseekingwants "Inactive not seeking but wants"
-
-gen econ_inactivenotwant=.
-replace  econ_inactivenotwant=1 if inecac05==18 | (inecac05>=20 & inecac05<=23) | inecac05==25
-replace econ_inactivenotwant=0 if (inecac05>0 & inecac05 <18)  |  inecac05==19 | inecac05==24 | inecac05==26
-label variable econ_inactivenotwant "Inactive not seeking not want"
-
-/* Global employment reference = Full time */
-global employment econ_pttime econ_selfemployed econ_govttraining econ_familyworker econ_unemployed econ_student econ_retired econ_inactiveseekingunavail econ_inactivenotseekingwants econ_inactivenotwant
-
-gen employed = econ_ftime ==1 | econ_pttime==1 | econ_selfemployed==1
-replace employed=. if econ_ftime==. & econ_pttime==. & econ_selfemployed==.
-
 gen lgrosspay=log((grosspay+1))
 replace lgrosspay=. if grosspay==.
-
-global employment_stat econ_ftime econ_pttime econ_selfemployed econ_govttraining econ_familyworker econ_unemployed econ_student econ_retired econ_inactiveseekingunavail econ_inactivenotseekingwants econ_inactivenotwant
 
 /***************************************************************************************************/
 /**  Wellbeing varies by place. The code below generates dummy variables for each region      **/
@@ -717,6 +663,7 @@ esttab using "$OUTPUT/LS_reg.csv", /// name and location of csv output
 	wide b(%10.3f) star(* 0.1 ** 0.05 *** 0.01) /// report coefficient (b)and pvalue (asterix for levels of significance (standard for SWB analysis is minimum 90% confidence, given that around 30-40% of SWB is thought to be driven by genetic factors); you can also output standard error with the se command
 	not replace plain // not=no t statistic; replace = write over any previously saved csv of same name; plain = produce a minimally formatted table. For more table formatting commands see: http://repec.org/bocode/e/estout/hlp_esttab.html
 eststo clear
+* Note, if you still have the csv file open and try to run the esttab command, stata will report an error. So close your csv files 
 
 * You can now find the output csv in the Output folder
 
