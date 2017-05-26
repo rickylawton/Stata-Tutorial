@@ -65,13 +65,13 @@ tabulate female sex // After creating a new variable you should crosstabulate th
 /***************************************************************************************************/
 * Here we recode the existing variable excluding observations outside of the 0-10 scale, and generate a new set of SWB variables
 
-recode satis (0 = 0)(10 = 10), gen (LS)
+gen LS = satis
 replace LS =. if (satis ==. | satis<0 | satis >10)
-recode worth (0 = 0)(10 = 10), gen (WW)
+gen WW = worth
 replace WW =. if (worth ==.  | worth<0 | worth >10)
-recode happy (0 = 0)(10 = 10), gen (HA)
+gen HA = happy
 replace HA =. if (happy ==.  | happy<0 | happy >10)
-recode anxious (0 = 0)(10 = 10), gen (AN)
+gen AN = anxious
 replace AN =. if (anxious ==.  | anxious<0 | anxious >10)
 * Positive Affect Balance (PAB) = happiness / anxiety
 gen PAB=.
